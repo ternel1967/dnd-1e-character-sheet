@@ -1,66 +1,85 @@
-import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
-export const useCharacterStore = defineStore('character', () => {
-  const characters = ref([])
-  const activeCharacterId = ref(null)
+// State
+const characters = ref([])
+const activeCharacterId = ref(null)
 
-  const activeCharacter = computed(() => 
-    characters.value.find(c => c.id === activeCharacterId.value)
-  )
+// Getters
+const activeCharacter = computed(() => {
+  return characters.value.find(char => char.id === activeCharacterId.value)
+})
 
-  const addCharacter = (character) => {
-    const newChar = {
-      id: Date.now(),
-      createdAt: new Date(),
-      ...character
-    }
-    characters.value.push(newChar)
-    activeCharacterId.value = newChar.id
-    return newChar
-  }
-
-  const updateCharacter = (id, updates) => {
-    const char = characters.value.find(c => c.id === id)
-    if (char) {
-      Object.assign(char, updates)
-    }
-  }
-
-  const deleteCharacter = (id) => {
-    characters.value = characters.value.filter(c => c.id !== id)
-    if (activeCharacterId.value === id) {
-      activeCharacterId.value = characters.value[0]?.id || null
-    }
-  }
-
-  const setActiveCharacter = (id) => {
-    activeCharacterId.value = id
-  }
-
-  const saveToLocalStorage = () => {
-    localStorage.setItem('dndCharacters', JSON.stringify(characters.value))
-  }
-
-  const loadFromLocalStorage = () => {
-    const saved = localStorage.getItem('dndCharacters')
-    if (saved) {
-      characters.value = JSON.parse(saved)
-      if (characters.value.length > 0) {
-        activeCharacterId.value = characters.value[0].id
+// Actions
+export function useCharacterStore() {
+  return {
+    characters,
+    activeCharacterId,
+    activeCharacter,
+    
+    setActiveCharacter(id) {
+      activeCharacterId.value = id
+    },
+    
+    addCharacter(character) {
+      character.id = Date.now()
+      characters.value.push(character)
+      activeCharacterId.value = character.id
+    },
+    
+    updateCharacter(id, updates) {
+      const character = characters.value.find(char => char.id === id)
+      if (character) {
+        Object.assign(character, updates)
+      }
+    },
+    
+    deleteCharacter(id) {
+      characters.value = characters.value.filter(char => char.id !== id)
+      if (activeCharacterId.value === id) {
+        activeCharacterId.value = characters.value[0]?.id || null
+      }
+    },
+    
+    saveToLocalStorage() {
+      localStorage.setItem('dnd_characters', JSON.stringify(characters.value))
+    },
+    
+    loadFromLocalStorage() {
+      const stored = localStorage.getItem('dnd_characters')
+      if (stored) {
+        try {
+          characters.value = JSON.parse(stored)
+          if (characters.value.length > 0) {
+            activeCharacterId.value = characters.value[0].id
+          }
+        } catch (error) {
+          console.error('Failed to load characters:', error)
+        }
+      }
+    },
+    
+    exportCharacter(id) {
+      const character = characters.value.find(char => char.id === id)
+      return character ? JSON.stringify(character, null, 2) : null
+    },
+    
+    importCharacter(characterData) {
+      try {
+        const character = typeof characterData === 'string' ? JSON.parse(characterData) : characterData
+        this.addCharacter(character)
+        return true
+      } catch (error) {
+        console.error('Failed to import character:', error)
+        return false
       }
     }
   }
+}
 
-  return {
-    characters,
-    activeCharacter,
-    activeCharacterId,
-    addCharacter,
-    updateCharacter,
-    deleteCharacter,
-    setActiveCharacter,
-    saveToLocalStorage,
-    loadFromLocalStorage
+export function setupAutoSave(store, interval = 60000) {
+  if (interval > 0) {
+    setInterval(() => {
+      store.saveToLocalStorage()
+    }, interval)
   }
-})
+}

@@ -7,7 +7,7 @@
           {{ character.subrace || character.race }} {{ character.classes[0].class }} - Level {{ character.level }}
         </p>
         <p v-else>
-          {{ character.subrace || character.race }} 
+          {{ character.subrace || character.race }}
           <span v-for="(cls, idx) in character.classes" :key="idx">
             {{ cls.class }} <strong>{{ cls.level }}</strong><span v-if="idx < character.classes.length - 1"> / </span>
           </span>
@@ -31,6 +31,12 @@
         </button>
         <button @click="activeTab = 'equipment'" :class="['tab-btn', { active: activeTab === 'equipment' }]">
           Equipment
+        </button>
+        <button @click="activeTab = 'combat-tracker'" :class="['tab-btn', { active: activeTab === 'combat-tracker' }]">
+          ⚔️ Tracker
+        </button>
+        <button @click="activeTab = 'settings'" :class="['tab-btn', { active: activeTab === 'settings' }]">
+          ⚙️ Settings
         </button>
       </div>
     </div>
@@ -66,6 +72,20 @@
     <div v-if="activeTab === 'equipment'" class="tab-content">
       <EquipmentManager :character="character" @update="$emit('update', $event)" />
     </div>
+
+    <!-- Combat Tracker Tab -->
+    <div v-if="activeTab === 'combat-tracker'" class="tab-content">
+      <CombatTracker :character="character" />
+    </div>
+
+    <!-- Settings Tab -->
+    <div v-if="activeTab === 'settings'" class="tab-content">
+      <SettingsPanel 
+        :characters="[character]"
+        :diceHistory="diceHistory"
+        @clear-dice-history="clearDiceHistory"
+      />
+    </div>
   </div>
 </template>
 
@@ -78,6 +98,8 @@ import SkillTracker from './SkillTracker.vue'
 import SpellManager from './SpellManager.vue'
 import ClassAbilities from './ClassAbilities.vue'
 import EquipmentManager from './EquipmentManager.vue'
+import CombatTracker from './CombatTracker.vue'
+import SettingsPanel from './SettingsPanel.vue'
 
 export default {
   components: {
@@ -88,14 +110,22 @@ export default {
     SkillTracker,
     SpellManager,
     ClassAbilities,
-    EquipmentManager
+    EquipmentManager,
+    CombatTracker,
+    SettingsPanel
   },
   props: {
     character: Object
   },
   data() {
     return {
-      activeTab: 'stats'
+      activeTab: 'stats',
+      diceHistory: []
+    }
+  },
+  methods: {
+    clearDiceHistory() {
+      this.diceHistory = []
     }
   }
 }
@@ -116,6 +146,8 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
 }
 
 .header-info h2 {
@@ -131,7 +163,7 @@ export default {
 
 .header-actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
 }

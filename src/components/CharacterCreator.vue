@@ -287,10 +287,6 @@ export default {
         }
 
         const totalLevels = validClasses.reduce((sum, cl) => sum + cl.level, 0)
-        if (totalLevels < 3) {
-          alert('Total levels must be at least 3')
-          return
-        }
 
         classes = validClasses.map(cl => ({
           class: this.CHARACTER_CLASSES[cl.class].name,

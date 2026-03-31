@@ -72,16 +72,35 @@
         <div v-if="getSpellsByLevel(level).length > 0" class="level-section">
           <h4>Level {{ level }} Spells ({{ getSpellsByLevel(level).length }})</h4>
           <div class="spells-list">
-            <div v-for="spell in getSpellsByLevel(level)" :key="spell.id" class="spell-item">
+            <div v-for="spell in getSpellsByLevel(level)" :key="spell.id" class="spell-item" @click="viewSpellDetails(spell)">
               <div class="spell-info">
                 <h5>{{ spell.name }}</h5>
                 <p class="spell-school">{{ spell.school }}</p>
               </div>
               <div class="spell-actions">
                 <button @click="castSpell(spell, level)" class="btn-cast">Cast</button>
-                <button @click="removeSpell(spell.id)" class="btn-remove">✕</button>
+                <button @click.stop="removeSpell(spell.id)" class="btn-remove">✕</button>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Spell Details Modal -->
+      <div v-if="selectedSpell" class="spell-detail-modal" @click="selectedSpell = null">
+        <div class="spell-detail-content" @click.stop>
+          <button @click="selectedSpell = null" class="close-btn">✕</button>
+          <h3>{{ selectedSpell.name }}</h3>
+          <div class="spell-meta">
+            <span class="level">Level {{ selectedSpell.level }}</span>
+            <span class="school">{{ selectedSpell.school }}</span>
+          </div>
+          <div class="spell-details">
+            <p><strong>Casting Time:</strong> {{ selectedSpell.castingTime }}</p>
+            <p><strong>Range:</strong> {{ selectedSpell.range }}</p>
+            <p><strong>Components:</strong> {{ selectedSpell.components }}</p>
+            <p><strong>Duration:</strong> {{ selectedSpell.duration }}</p>
+            <p><strong>Description:</strong> {{ selectedSpell.description }}</p>
           </div>
         </div>
       </div>
@@ -105,7 +124,7 @@
 </template>
 
 <script>
-import { SPELL_SCHOOLS } from '../utils/spellDatabase.js'
+import { SPELL_SCHOOLS, getSpellDetails } from '../utils/spellDatabase.js'
 import { calculateModifier } from '../utils/rules1e.js'
 
 const commonSpells = [
@@ -136,7 +155,8 @@ export default {
       },
       spellSchools: Object.values(SPELL_SCHOOLS),
       commonSpells,
-      usedSlots: {}
+      usedSlots: {},
+      selectedSpell: null
     }
   },
   computed: {
@@ -252,6 +272,10 @@ export default {
     isCleric() {
       if (!this.character.classes) return false
       return this.character.classes.some(c => c.class === 'Cleric' || c.class === 'Druid')
+    },
+    viewSpellDetails(spell) {
+      const details = getSpellDetails(spell.name)
+      this.selectedSpell = details || spell
     }
   }
 }
@@ -445,6 +469,13 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.spell-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(255, 215, 0, 0.1);
 }
 
 .spell-info h5 {
@@ -476,6 +507,76 @@ export default {
 .btn-remove {
   background: var(--accent-error);
   color: #fff;
+}
+
+.spell-detail-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.spell-detail-content {
+  background: var(--bg-light);
+  border: 2px solid var(--primary);
+  border-radius: 8px;
+  padding: 20px;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.spell-detail-content h3 {
+  margin: 0 0 15px 0;
+  color: var(--primary);
+}
+
+.close-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.spell-meta {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.level, .school {
+  background: var(--bg-dark);
+  padding: 5px 10px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.spell-details {
+  background: var(--bg-dark);
+  padding: 15px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.spell-details p {
+  margin: 10px 0;
+  line-height: 1.5;
+}
+
+.spell-details strong {
+  color: var(--primary);
 }
 
 .common-spells {
