@@ -57,6 +57,70 @@
         </button>
       </div>
     </div>
+
+    <!-- Thief Abilities -->
+    <div v-if="isThief" class="thief-abilities">
+      <h4>Thief Special Abilities</h4>
+      <div class="thief-abilities-grid">
+        <div class="thief-ability-section">
+          <label>Backstab Multiplier</label>
+          <div class="backstab-info">
+            <span class="multiplier">x{{ backstabMultiplier }}</span>
+            <p class="description">Surprise attack damage multiplier</p>
+          </div>
+        </div>
+
+        <div class="thief-ability-section">
+          <label>Hide in Shadows</label>
+          <div class="hide-info">
+            <p>Success Chance: {{ hideChance }}%</p>
+            <button @click="rollThiefSkill('Hide')" class="btn-roll-skill">Hide</button>
+          </div>
+        </div>
+
+        <div class="thief-ability-section">
+          <label>Move Silently</label>
+          <div class="move-info">
+            <p>Success Chance: {{ moveChance }}%</p>
+            <button @click="rollThiefSkill('Move Silently')" class="btn-roll-skill">Move</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="thieving-skills">
+        <h4 style="margin-top: 20px;">Thieving Skills</h4>
+        <div class="skills-row">
+          <div class="thief-skill">
+            <span>Pick Locks</span>
+            <div class="skill-roll">
+              <button @click="rollThiefSkill('Pick Locks')" class="btn-roll-skill">Roll 1d100</button>
+              <span class="dc">Base DC: 40%</span>
+            </div>
+          </div>
+          <div class="thief-skill">
+            <span>Find Traps</span>
+            <div class="skill-roll">
+              <button @click="rollThiefSkill('Find Traps')" class="btn-roll-skill">Roll 1d100</button>
+              <span class="dc">Base DC: 40%</span>
+            </div>
+          </div>
+          <div class="thief-skill">
+            <span>Disarm Traps</span>
+            <div class="skill-roll">
+              <button @click="rollThiefSkill('Disarm Traps')" class="btn-roll-skill">Roll 1d100</button>
+              <span class="dc">Base DC: 50%</span>
+            </div>
+          </div>
+          <div class="thief-skill">
+            <span>Pickpocket</span>
+            <div class="skill-roll">
+              <button @click="rollThiefSkill('Pickpocket')" class="btn-roll-skill">Roll 1d100</button>
+              <span class="dc">Base DC: 50%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -88,6 +152,46 @@ export default {
         { name: 'Persuasion', linkedAbility: 'CHA', bonus: 0 },
         { name: 'Knowledge (Arcana)', linkedAbility: 'INT', bonus: 0 }
       ]
+    }
+  },
+  computed: {
+    isThief() {
+      if (!this.character.classes) return false
+      return this.character.classes.some(c => c.class === 'Thief')
+    },
+    backstabMultiplier() {
+      if (!this.character.classes) return 2
+      const thief = this.character.classes.find(c => c.class === 'Thief')
+      if (!thief) return 2
+      
+      const level = thief.level
+      if (level <= 4) return 2
+      if (level <= 8) return 3
+      if (level <= 12) return 4
+      if (level <= 16) return 5
+      return 6
+    },
+    hideChance() {
+      if (!this.character.classes) return 0
+      const thief = this.character.classes.find(c => c.class === 'Thief')
+      if (!thief) return 0
+      
+      const baseChance = {
+        1: 10, 2: 15, 3: 20, 4: 25, 5: 30, 6: 35, 7: 40, 8: 45, 9: 50,
+        10: 55, 11: 60, 12: 65, 13: 70, 14: 75, 15: 80, 16: 85, 17: 90, 18: 95
+      }
+      return baseChance[thief.level] || 95
+    },
+    moveChance() {
+      if (!this.character.classes) return 0
+      const thief = this.character.classes.find(c => c.class === 'Thief')
+      if (!thief) return 0
+      
+      const baseChance = {
+        1: 10, 2: 15, 3: 20, 4: 25, 5: 30, 6: 35, 7: 40, 8: 45, 9: 50,
+        10: 55, 11: 60, 12: 65, 13: 70, 14: 75, 15: 80, 16: 85, 17: 90, 18: 95
+      }
+      return baseChance[thief.level] || 95
     }
   },
   methods: {
@@ -134,6 +238,34 @@ export default {
       const roll = Math.floor(Math.random() * 20) + 1
       const total = roll + abilityMod + skill.bonus
       alert(`${skill.name}: Rolled ${roll} + ${abilityMod} (${skill.linkedAbility}) + ${skill.bonus} = ${total}`)
+    },
+    rollThiefSkill(skillName) {
+      const roll = Math.floor(Math.random() * 100) + 1
+      let successChance = 50
+
+      switch(skillName) {
+        case 'Pick Locks':
+          successChance = 40
+          break
+        case 'Find Traps':
+          successChance = 40
+          break
+        case 'Disarm Traps':
+          successChance = 50
+          break
+        case 'Pickpocket':
+          successChance = 50
+          break
+        case 'Hide':
+          successChance = this.hideChance
+          break
+        case 'Move Silently':
+          successChance = this.moveChance
+          break
+      }
+
+      const success = roll <= successChance
+      alert(`${skillName}: Rolled ${roll} vs ${successChance}% - ${success ? '✓ SUCCESS' : '✗ FAILED'}`)
     }
   }
 }
@@ -263,6 +395,7 @@ export default {
   background: var(--bg-light);
   padding: 15px;
   border-radius: 4px;
+  margin-bottom: 20px;
 }
 
 .common-skills h4 {
@@ -291,5 +424,108 @@ export default {
 .btn-common:hover {
   border-color: var(--primary);
   color: var(--primary);
+}
+
+.thief-abilities {
+  background: var(--bg-light);
+  padding: 15px;
+  border-radius: 4px;
+  margin-top: 20px;
+}
+
+.thief-abilities h4 {
+  margin: 0 0 15px 0;
+  color: var(--primary);
+}
+
+.thief-abilities-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.thief-ability-section {
+  background: var(--bg-dark);
+  padding: 12px;
+  border-radius: 4px;
+  border: 1px solid #444;
+}
+
+.thief-ability-section label {
+  display: block;
+  color: var(--primary);
+  font-weight: bold;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.backstab-info, .hide-info, .move-info {
+  text-align: center;
+}
+
+.multiplier {
+  display: block;
+  color: var(--accent-info);
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.description {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin: 0;
+}
+
+.hide-info p, .move-info p {
+  color: var(--text-muted);
+  margin: 0 0 8px 0;
+  font-size: 12px;
+}
+
+.thieving-skills {
+  background: var(--bg-dark);
+  padding: 15px;
+  border-radius: 4px;
+}
+
+.thieving-skills h4 {
+  margin: 0 0 15px 0;
+  color: var(--primary);
+  font-size: 13px;
+}
+
+.skills-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.thief-skill {
+  background: var(--bg-light);
+  padding: 8px;
+  border-radius: 3px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.thief-skill span {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.skill-roll {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.dc {
+  color: var(--text-muted);
+  font-size: 10px;
+  white-space: nowrap;
 }
 </style>

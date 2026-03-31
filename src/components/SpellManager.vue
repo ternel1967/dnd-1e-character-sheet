@@ -1,539 +1,514 @@
 <template>
   <div class="spell-manager">
-    <div class="spell-header">
-      <h3>{{ character.name }} - Spells</h3>
-      <div class="spell-filters">
-        <select v-model="selectedLevel" class="filter-select">
-          <option value="">All Levels</option>
-          <option v-for="level in availableSpellLevels" :key="level" :value="level">
-            Level {{ level }}
-          </option>
-        </select>
-        
-        <select v-model="selectedSchool" class="filter-select">
-          <option value="">All Schools</option>
-          <option v-for="school in Object.values(SPELL_SCHOOLS)" :key="school" :value="school">
-            {{ school }}
-          </option>
-        </select>
-
-        <input 
-          v-model="searchQuery" 
-          type="text" 
-          placeholder="Search spells..."
-          class="search-input"
-        >
-      </div>
-    </div>
-
-    <div class="spell-tabs">
-      <button 
-        v-for="tab in tabs" 
-        :key="tab"
-        @click="activeTab = tab"
-        :class="['tab-button', { active: activeTab === tab }]"
-      >
-        {{ tab }}
+    <div class="spells-header">
+      <h3>Spell Management</h3>
+      <button @click="showAddSpell = !showAddSpell" class="btn btn-secondary">
+        {{ showAddSpell ? '✕ Cancel' : '➕ Add Spell' }}
       </button>
     </div>
 
-    <div class="spell-content">
-      <!-- Available Spells -->
-      <div v-if="activeTab === 'Available'" class="available-spells">
-        <div class="spell-list">
-          <div 
-            v-for="spell in filteredAvailableSpells" 
-            :key="spell.name"
-            class="spell-item"
-          >
-            <div class="spell-info">
-              <h4>{{ spell.name }}</h4>
-              <p class="spell-level">Level {{ selectedLevel || 'Varies' }}</p>
-              <p class="spell-school">{{ spell.school }}</p>
-              <p class="spell-components">{{ formatComponents(spell.components) }}</p>
-              <p v-if="spell.description" class="spell-description">{{ spell.description }}</p>
+    <!-- Check if character can cast spells -->
+    <div v-if="!canCastSpells" class="no-spells">
+      <p>This class cannot cast spells.</p>
+    </div>
+
+    <div v-else>
+      <!-- Add Spell Form -->
+      <div v-if="showAddSpell" class="add-spell-form">
+        <input 
+          v-model="newSpell.name" 
+          type="text" 
+          class="input-field"
+          placeholder="Spell name"
+        >
+        <select v-model.number="newSpell.level" class="input-field">
+          <option value="">Select Level</option>
+          <option v-for="lvl in availableSpellLevels" :key="lvl" :value="lvl">
+            Level {{ lvl }}
+          </option>
+        </select>
+        <select v-model="newSpell.school" class="input-field">
+          <option value="">Select School</option>
+          <option v-for="school in spellSchools" :key="school" :value="school">
+            {{ school }}
+          </option>
+        </select>
+        <button @click="addSpell" class="btn btn-primary">Add Spell</button>
+      </div>
+
+      <!-- Spell Slots -->
+      <div class="spell-slots">
+        <h4>Available Spell Slots</h4>
+        <div class="slots-grid">
+          <div v-for="level in 9" :key="level" class="slot-box">
+            <div class="slot-label">Level {{ level }}</div>
+            <div class="slot-count">
+              <span class="used">{{ getUsedSlots(level) }}</span>
+              <span class="separator">/</span>
+              <span class="total">{{ getMaxSlots(level) }}</span>
             </div>
-            <button @click="addSpellToMemory(spell)" class="btn-add">
-              ➕ Add
-            </button>
+            <div class="slot-actions">
+              <button 
+                @click="useSpellSlot(level)" 
+                :disabled="getUsedSlots(level) >= getMaxSlots(level)"
+                class="btn-use"
+              >
+                Use
+              </button>
+              <button 
+                @click="restoreSpellSlot(level)"
+                :disabled="getUsedSlots(level) <= 0"
+                class="btn-restore"
+              >
+                Restore
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Memorized Spells -->
-      <div v-if="activeTab === 'Memorized'" class="memorized-spells">
-        <div class="spell-slots">
-          <div v-for="level in 9" :key="level" class="spell-level-section">
-            <h3>Level {{ level }} Spells</h3>
-            <p class="slot-info">
-              Memorized: {{ countMemorizedSpells(level) }} / {{ getMaxSpellSlots(level) }}
-            </p>
-            
-            <div class="spell-list">
-              <div 
-                v-for="spell in getMemorizedSpellsByLevel(level)" 
-                :key="`${spell.name}-${spell.id}`"
-                class="spell-item memorized"
-              >
-                <div class="spell-info">
-                  <h4>{{ spell.name }}</h4>
-                  <p class="spell-school">{{ spell.school }}</p>
-                  <p class="spell-cast">Cast: {{ spell.cast ? '✓' : '○' }}</p>
-                </div>
-                <div class="spell-actions">
-                  <button 
-                    @click="toggleSpellCast(spell.id)"
-                    :class="['btn-cast', { cast: spell.cast }]"
-                  >
-                    {{ spell.cast ? '✓ Cast' : 'Ready' }}
-                  </button>
-                  <button @click="removeSpellFromMemory(spell.id)" class="btn-remove">
-                    ✕
-                  </button>
-                </div>
+      <!-- Memorized Spells by Level -->
+      <div v-for="level in 9" :key="level" class="spells-by-level">
+        <div v-if="getSpellsByLevel(level).length > 0" class="level-section">
+          <h4>Level {{ level }} Spells ({{ getSpellsByLevel(level).length }})</h4>
+          <div class="spells-list">
+            <div v-for="spell in getSpellsByLevel(level)" :key="spell.id" class="spell-item">
+              <div class="spell-info">
+                <h5>{{ spell.name }}</h5>
+                <p class="spell-school">{{ spell.school }}</p>
+              </div>
+              <div class="spell-actions">
+                <button @click="castSpell(spell, level)" class="btn-cast">Cast</button>
+                <button @click="removeSpell(spell.id)" class="btn-remove">✕</button>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Spell Details -->
-      <div v-if="activeTab === 'Details'" class="spell-details">
-        <div v-if="selectedSpell" class="detail-panel">
-          <h2>{{ selectedSpell.name }}</h2>
-          <div class="detail-grid">
-            <div><strong>School:</strong> {{ selectedSpell.school }}</div>
-            <div><strong>Level:</strong> {{ selectedSpellLevel }}</div>
-            <div><strong>Casting Time:</strong> {{ selectedSpell.castingTime }}</div>
-            <div><strong>Range:</strong> {{ selectedSpell.range }}</div>
-            <div><strong>Components:</strong> {{ formatComponents(selectedSpell.components) }}</div>
-            <div><strong>Duration:</strong> {{ selectedSpell.duration }}</div>
-            <div><strong>Saving Throw:</strong> {{ selectedSpell.save }}</div>
-            <div v-if="selectedSpell.ritualizable"><strong>Ritualizable:</strong> Yes</div>
-          </div>
-          <div class="spell-description-full">
-            <strong>Description:</strong>
-            <textarea v-model="selectedSpell.description" placeholder="Add spell description..." rows="5"></textarea>
-          </div>
+      <!-- Common Spells -->
+      <div class="common-spells">
+        <h4>Quick Add Common Spells</h4>
+        <div class="spells-grid">
+          <button 
+            v-for="spell in commonSpells" 
+            :key="spell.name" 
+            @click="addCommonSpell(spell)" 
+            class="btn-spell"
+          >
+            {{ spell.name }}
+          </button>
         </div>
-      </div>
-    </div>
-
-    <!-- Add Custom Spell -->
-    <div class="add-custom-spell">
-      <button @click="showCustomSpellForm = !showCustomSpellForm" class="btn-secondary">
-        {{ showCustomSpellForm ? '✕ Cancel' : '➕ Add Custom Spell' }}
-      </button>
-      
-      <div v-if="showCustomSpellForm" class="custom-spell-form">
-        <input v-model="newSpell.name" placeholder="Spell Name" class="input-field">
-        <select v-model="newSpell.level" class="input-field">
-          <option value="">Select Level</option>
-          <option v-for="n in 9" :key="n" :value="n">Level {{ n }}</option>
-        </select>
-        <select v-model="newSpell.school" class="input-field">
-          <option value="">Select School</option>
-          <option v-for="school in Object.values(SPELL_SCHOOLS)" :key="school" :value="school">
-            {{ school }}
-          </option>
-        </select>
-        <textarea v-model="newSpell.description" placeholder="Description" class="input-field" rows="3"></textarea>
-        <button @click="saveCustomSpell" class="btn-primary">Save Custom Spell</button>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import { SPELL_SCHOOLS, SPELL_CLASSES, getAllSpellsByClass, getSpellsForLevel } from '../utils/spellDatabase.js';
+import { SPELL_SCHOOLS } from '../utils/spellDatabase.js'
+import { calculateModifier } from '../utils/rules1e.js'
+
+const commonSpells = [
+  { name: 'Magic Missile', level: 1, school: 'Evocation' },
+  { name: 'Shield', level: 1, school: 'Abjuration' },
+  { name: 'Burning Hands', level: 1, school: 'Evocation' },
+  { name: 'Sleep', level: 1, school: 'Enchantment' },
+  { name: 'Fireball', level: 3, school: 'Evocation' },
+  { name: 'Lightning Bolt', level: 3, school: 'Evocation' },
+  { name: 'Invisibility', level: 2, school: 'Illusion' },
+  { name: 'Cure Light Wounds', level: 1, school: 'Necromancy' },
+  { name: 'Bless', level: 1, school: 'Enchantment' },
+  { name: 'Detect Magic', level: 1, school: 'Divination' }
+]
 
 export default {
   name: 'SpellManager',
   props: {
-    character: Object,
+    character: Object
   },
   data() {
     return {
-      SPELL_SCHOOLS,
-      SPELL_CLASSES,
-      activeTab: 'Available',
-      tabs: ['Available', 'Memorized', 'Details'],
-      selectedLevel: '',
-      selectedSchool: '',
-      searchQuery: '',
-      selectedSpell: null,
-      selectedSpellLevel: null,
-      showCustomSpellForm: false,
-      memorizedSpells: [],
+      showAddSpell: false,
       newSpell: {
         name: '',
-        level: '',
-        school: '',
-        description: ''
-      }
-    };
+        level: 1,
+        school: 'Evocation'
+      },
+      spellSchools: Object.values(SPELL_SCHOOLS),
+      commonSpells,
+      usedSlots: {}
+    }
   },
   computed: {
+    canCastSpells() {
+      const spellcastingClasses = ['Magic-User', 'Cleric', 'Druid', 'Ranger', 'Paladin', 'Bard']
+      if (!this.character.classes) return false
+      return this.character.classes.some(cls => spellcastingClasses.includes(cls.class))
+    },
     availableSpellLevels() {
-      const spells = getAllSpellsByClass(this.character.class);
-      return Object.keys(spells).map(Number).sort((a, b) => a - b);
-    },
-    allAvailableSpells() {
-      const spellBook = getAllSpellsByClass(this.character.class);
-      let spells = [];
-      
-      for (const level in spellBook) {
-        spellBook[level].forEach(spell => {
-          spells.push({ ...spell, level: parseInt(level) });
-        });
+      const maxLevel = this.character.level || 1
+      const levels = []
+      for (let i = 1; i <= Math.min(maxLevel, 9); i++) {
+        levels.push(i)
       }
-      return spells;
-    },
-    filteredAvailableSpells() {
-      let filtered = this.allAvailableSpells;
-      
-      if (this.selectedLevel) {
-        filtered = filtered.filter(s => s.level === parseInt(this.selectedLevel));
+      return levels
+    }
+  },
+  watch: {
+    character: {
+      immediate: true,
+      handler() {
+        if (!this.character.memorizedSpells) {
+          this.character.memorizedSpells = []
+        }
+        if (!this.character.spellSlots) {
+          this.character.spellSlots = {}
+        }
       }
-      
-      if (this.selectedSchool) {
-        filtered = filtered.filter(s => s.school === this.selectedSchool);
-      }
-      
-      if (this.searchQuery) {
-        filtered = filtered.filter(s => 
-          s.name.toLowerCase().includes(this.searchQuery.toLowerCase())
-        );
-      }
-      
-      return filtered;
     }
   },
   methods: {
-    formatComponents(components) {
-      return components.join(', ');
+    addSpell() {
+      if (!this.newSpell.name || this.newSpell.level === '') {
+        alert('Please fill in spell details')
+        return
+      }
+
+      if (!this.character.memorizedSpells) {
+        this.character.memorizedSpells = []
+      }
+
+      const spell = {
+        id: Date.now(),
+        ...this.newSpell
+      }
+
+      this.character.memorizedSpells.push(spell)
+      this.$emit('update', { memorizedSpells: this.character.memorizedSpells })
+
+      this.newSpell = { name: '', level: 1, school: 'Evocation' }
+      this.showAddSpell = false
     },
-    addSpellToMemory(spell) {
-      const id = `${spell.name}-${Date.now()}`;
-      this.memorizedSpells.push({
-        ...spell,
-        id,
-        cast: false
-      });
-      alert(`${spell.name} added to memorized spells!`);
+    addCommonSpell(spell) {
+      if (!this.character.memorizedSpells) {
+        this.character.memorizedSpells = []
+      }
+
+      const newSpell = {
+        id: Date.now(),
+        ...spell
+      }
+
+      this.character.memorizedSpells.push(newSpell)
+      this.$emit('update', { memorizedSpells: this.character.memorizedSpells })
     },
-    removeSpellFromMemory(id) {
-      this.memorizedSpells = this.memorizedSpells.filter(s => s.id !== id);
+    removeSpell(id) {
+      this.character.memorizedSpells = this.character.memorizedSpells.filter(s => s.id !== id)
+      this.$emit('update', { memorizedSpells: this.character.memorizedSpells })
     },
-    toggleSpellCast(id) {
-      const spell = this.memorizedSpells.find(s => s.id === id);
-      if (spell) {
-        spell.cast = !spell.cast;
+    getSpellsByLevel(level) {
+      if (!this.character.memorizedSpells) return []
+      return this.character.memorizedSpells.filter(s => s.level === level)
+    },
+    getMaxSlots(level) {
+      const intMod = calculateModifier(this.character.stats.INT)
+      const wisMod = calculateModifier(this.character.stats.WIS)
+      const mod = this.isCleric() ? wisMod : intMod
+
+      if (level > this.character.level) return 0
+      
+      const baseSlots = level === 1 ? 1 : Math.floor((this.character.level - level + 1) / 2)
+      const bonusSlots = mod >= level ? 1 : 0
+      
+      return Math.max(0, baseSlots + bonusSlots)
+    },
+    getUsedSlots(level) {
+      return (this.character.spellSlots && this.character.spellSlots[level]) || 0
+    },
+    useSpellSlot(level) {
+      if (!this.character.spellSlots) {
+        this.character.spellSlots = {}
+      }
+
+      if (!this.character.spellSlots[level]) {
+        this.character.spellSlots[level] = 0
+      }
+
+      if (this.character.spellSlots[level] < this.getMaxSlots(level)) {
+        this.character.spellSlots[level]++
+        this.$emit('update', { spellSlots: this.character.spellSlots })
       }
     },
-    getMemorizedSpellsByLevel(level) {
-      return this.memorizedSpells.filter(s => s.level === level);
-    },
-    countMemorizedSpells(level) {
-      return this.getMemorizedSpellsByLevel(level).length;
-    },
-    getMaxSpellSlots(level) {
-      // Simple calculation - adjust based on character stats
-      const charLevel = this.character.level;
-      const intMod = Math.floor((this.character.stats.INT - 10) / 2);
-      
-      if (level > charLevel) return 0;
-      if (charLevel < 4 && level > 1) return 0;
-      
-      return Math.max(1, intMod + level);
-    },
-    saveCustomSpell() {
-      if (this.newSpell.name && this.newSpell.level && this.newSpell.school) {
-        this.memorizedSpells.push({
-          ...this.newSpell,
-          id: `custom-${Date.now()}`,
-          level: parseInt(this.newSpell.level),
-          components: ['V', 'S'],
-          castingTime: '1 segment',
-          range: '0',
-          duration: 'Special',
-          save: 'None',
-          cast: false
-        });
-        
-        this.newSpell = { name: '', level: '', school: '', description: '' };
-        this.showCustomSpellForm = false;
-        alert('Custom spell added!');
+    restoreSpellSlot(level) {
+      if (this.character.spellSlots && this.character.spellSlots[level] > 0) {
+        this.character.spellSlots[level]--
+        this.$emit('update', { spellSlots: this.character.spellSlots })
       }
+    },
+    castSpell(spell, level) {
+      alert(`Cast ${spell.name}!`)
+      this.useSpellSlot(level)
+    },
+    isCleric() {
+      if (!this.character.classes) return false
+      return this.character.classes.some(c => c.class === 'Cleric' || c.class === 'Druid')
     }
   }
-};
+}
 </script>
 
 <style scoped>
 .spell-manager {
-  background: #1e1e2e;
+  background: var(--bg-dark);
   padding: 20px;
   border-radius: 8px;
-  color: #e0e0e0;
-}
-
-.spell-header {
   margin-bottom: 20px;
 }
 
-.spell-header h3 {
-  margin: 0 0 15px 0;
-  color: #ffd700;
-}
-
-.spell-filters {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 15px;
-}
-
-.filter-select, .search-input {
-  padding: 8px 12px;
-  background: #2d2d44;
-  border: 1px solid #444;
-  color: #e0e0e0;
-  border-radius: 4px;
-  font-size: 14px;
-}
-
-.search-input {
-  flex: 1;
-  min-width: 200px;
-}
-
-.spell-tabs {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
-  border-bottom: 2px solid #444;
-}
-
-.tab-button {
-  padding: 10px 20px;
-  background: transparent;
-  border: none;
-  color: #999;
-  cursor: pointer;
-  font-weight: 500;
-  border-bottom: 3px solid transparent;
-  transition: all 0.3s;
-}
-
-.tab-button.active {
-  color: #ffd700;
-  border-bottom-color: #ffd700;
-}
-
-.tab-button:hover {
-  color: #e0e0e0;
-}
-
-.spell-content {
-  min-height: 300px;
-}
-
-.available-spells, .memorized-spells {
-  overflow-y: auto;
-  max-height: 600px;
-}
-
-.spell-list {
-  display: grid;
-  gap: 10px;
-}
-
-.spell-item {
+.spells-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  background: #2d2d44;
-  padding: 12px;
-  border-radius: 4px;
-  border-left: 3px solid #ffd700;
-  gap: 15px;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid var(--primary);
 }
 
-.spell-item.memorized {
-  border-left-color: #4ade80;
+.spells-header h3 {
+  margin: 0;
+  color: var(--primary);
 }
 
-.spell-info {
-  flex: 1;
-}
-
-.spell-info h4 {
-  margin: 0 0 5px 0;
-  color: #ffd700;
-}
-
-.spell-level, .spell-school, .spell-components, .spell-cast {
-  margin: 3px 0;
-  font-size: 13px;
-  color: #999;
-}
-
-.spell-description {
-  margin-top: 8px;
-  font-size: 12px;
-  color: #bbb;
-  font-style: italic;
-}
-
-.btn-add, .btn-remove, .btn-cast {
-  padding: 8px 12px;
+.btn {
+  padding: 8px 16px;
   border: none;
   border-radius: 4px;
   cursor: pointer;
   font-weight: 500;
-  transition: all 0.2s;
-}
-
-.btn-add {
-  background: #4ade80;
-  color: #000;
-}
-
-.btn-add:hover {
-  background: #22c55e;
-}
-
-.btn-remove {
-  background: #ef4444;
-  color: #fff;
-}
-
-.btn-remove:hover {
-  background: #dc2626;
-}
-
-.btn-cast {
-  background: #3b82f6;
-  color: #fff;
-  min-width: 80px;
-}
-
-.btn-cast.cast {
-  background: #4ade80;
-}
-
-.spell-level-section {
-  margin-bottom: 25px;
-  background: #2d2d44;
-  padding: 15px;
-  border-radius: 4px;
-}
-
-.spell-level-section h3 {
-  margin: 0 0 8px 0;
-  color: #ffd700;
-  font-size: 16px;
-}
-
-.slot-info {
-  margin: 0 0 10px 0;
-  font-size: 13px;
-  color: #999;
-}
-
-.spell-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.spell-details {
-  background: #2d2d44;
-  padding: 20px;
-  border-radius: 4px;
-}
-
-.detail-panel h2 {
-  margin: 0 0 20px 0;
-  color: #ffd700;
-}
-
-.detail-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 15px;
-  margin-bottom: 20px;
-}
-
-.detail-grid div {
-  background: #1e1e2e;
-  padding: 10px;
-  border-radius: 4px;
-}
-
-.spell-description-full {
-  margin-top: 20px;
-}
-
-.spell-description-full textarea {
-  width: 100%;
-  background: #1e1e2e;
-  border: 1px solid #444;
-  color: #e0e0e0;
-  padding: 10px;
-  border-radius: 4px;
-  font-family: inherit;
-}
-
-.add-custom-spell {
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid #444;
 }
 
 .btn-secondary {
-  padding: 10px 20px;
-  background: #6366f1;
+  background: var(--accent-info);
   color: #fff;
-  border: none;
+}
+
+.no-spells {
+  background: var(--bg-light);
+  padding: 20px;
   border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
+  text-align: center;
+  color: var(--text-muted);
 }
 
-.btn-secondary:hover {
-  background: #4f46e5;
-}
-
-.custom-spell-form {
-  background: #2d2d44;
+.add-spell-form {
+  background: var(--bg-light);
   padding: 15px;
   border-radius: 4px;
-  margin-top: 15px;
+  margin-bottom: 20px;
   display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
   gap: 10px;
+  align-items: flex-end;
 }
 
 .input-field {
   padding: 8px 12px;
-  background: #1e1e2e;
+  background: var(--bg-dark);
   border: 1px solid #444;
-  color: #e0e0e0;
+  color: var(--text);
   border-radius: 4px;
-  font-family: inherit;
 }
 
 .btn-primary {
-  padding: 10px 20px;
-  background: #ffd700;
+  background: var(--primary);
   color: #000;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
 }
 
-.btn-primary:hover {
-  background: #ffed4e;
+.spell-slots {
+  background: var(--bg-light);
+  padding: 15px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+}
+
+.spell-slots h4 {
+  margin: 0 0 15px 0;
+  color: var(--primary);
+}
+
+.slots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.slot-box {
+  background: var(--bg-dark);
+  padding: 10px;
+  border-radius: 4px;
+  text-align: center;
+  border: 1px solid #444;
+}
+
+.slot-label {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+
+.slot-count {
+  color: var(--primary);
+  font-weight: bold;
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.used {
+  color: var(--accent-info);
+}
+
+.separator {
+  color: var(--text-muted);
+}
+
+.slot-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.btn-use, .btn-restore, .btn-cast, .btn-remove {
+  padding: 5px;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-use {
+  background: var(--accent-info);
+  color: #fff;
+}
+
+.btn-use:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.btn-use:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-restore {
+  background: var(--accent-success);
+  color: #000;
+}
+
+.btn-restore:hover:not(:disabled) {
+  background: #22c55e;
+}
+
+.btn-restore:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.spells-by-level {
+  margin-bottom: 20px;
+}
+
+.level-section {
+  background: var(--bg-light);
+  padding: 15px;
+  border-radius: 4px;
+}
+
+.level-section h4 {
+  margin: 0 0 10px 0;
+  color: var(--primary);
+  font-size: 14px;
+}
+
+.spells-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 10px;
+}
+
+.spell-item {
+  background: var(--bg-dark);
+  padding: 10px;
+  border-radius: 4px;
+  border-left: 3px solid var(--primary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.spell-info h5 {
+  margin: 0 0 3px 0;
+  color: var(--primary);
+  font-size: 14px;
+}
+
+.spell-school {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin: 0;
+}
+
+.spell-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.btn-cast {
+  background: var(--accent-info);
+  color: #fff;
+}
+
+.btn-cast:hover {
+  background: #2563eb;
+}
+
+.btn-remove {
+  background: var(--accent-error);
+  color: #fff;
+}
+
+.common-spells {
+  background: var(--bg-light);
+  padding: 15px;
+  border-radius: 4px;
+}
+
+.common-spells h4 {
+  margin: 0 0 15px 0;
+  color: var(--primary);
+  font-size: 13px;
+}
+
+.spells-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.btn-spell {
+  padding: 8px 12px;
+  background: var(--bg-dark);
+  border: 1px solid #444;
+  color: var(--text);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 12px;
+}
+
+.btn-spell:hover {
+  border-color: var(--primary);
+  color: var(--primary);
 }
 </style>

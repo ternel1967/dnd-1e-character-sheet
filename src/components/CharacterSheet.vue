@@ -23,14 +23,17 @@
         <button @click="activeTab = 'skills'" :class="['tab-btn', { active: activeTab === 'skills' }]">
           Skills
         </button>
+        <button @click="activeTab = 'spells'" :class="['tab-btn', { active: activeTab === 'spells' }]">
+          Spells
+        </button>
+        <button @click="activeTab = 'abilities'" :class="['tab-btn', { active: activeTab === 'abilities' }]">
+          Abilities
+        </button>
         <button @click="activeTab = 'equipment'" :class="['tab-btn', { active: activeTab === 'equipment' }]">
           Equipment
         </button>
       </div>
     </div>
-
-    <!-- Rest of template stays the same -->
-    ...
 
     <!-- Stats Tab -->
     <div v-if="activeTab === 'stats'" class="tab-content">
@@ -49,6 +52,16 @@
       <SkillTracker :character="character" @update="$emit('update', $event)" />
     </div>
 
+    <!-- Spells Tab -->
+    <div v-if="activeTab === 'spells'" class="tab-content">
+      <SpellManager :character="character" @update="$emit('update', $event)" />
+    </div>
+
+    <!-- Abilities Tab -->
+    <div v-if="activeTab === 'abilities'" class="tab-content">
+      <ClassAbilities :character="character" />
+    </div>
+
     <!-- Equipment Tab -->
     <div v-if="activeTab === 'equipment'" class="tab-content">
       <EquipmentManager :character="character" @update="$emit('update', $event)" />
@@ -62,6 +75,8 @@ import ExperienceTracker from './ExperienceTracker.vue'
 import CombatStats from './CombatStats.vue'
 import DiceRoller from './DiceRoller.vue'
 import SkillTracker from './SkillTracker.vue'
+import SpellManager from './SpellManager.vue'
+import ClassAbilities from './ClassAbilities.vue'
 import EquipmentManager from './EquipmentManager.vue'
 
 export default {
@@ -71,6 +86,8 @@ export default {
     CombatStats,
     DiceRoller,
     SkillTracker,
+    SpellManager,
+    ClassAbilities,
     EquipmentManager
   },
   props: {
@@ -116,10 +133,11 @@ export default {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .tab-btn {
-  padding: 8px 16px;
+  padding: 8px 12px;
   background: var(--bg-dark);
   border: 1px solid #444;
   color: var(--text-muted);
@@ -127,6 +145,7 @@ export default {
   cursor: pointer;
   transition: all 0.3s;
   font-weight: 500;
+  font-size: 13px;
 }
 
 .tab-btn:hover {

@@ -9,6 +9,24 @@
         <button @click="showNewCharacter = true" class="btn btn-primary">
           ➕ New Character
         </button>
+        <button @click="openPartyManager" class="btn btn-secondary">
+          👥 Party
+        </button>
+        <div class="dropdown">
+          <button class="btn btn-secondary">⬇️ Import/Export</button>
+          <div class="dropdown-menu">
+            <button @click="exportActive('json')">📄 Export as JSON</button>
+            <button @click="exportActive('csv')">📊 Export as CSV</button>
+            <button @click="triggerImport">📂 Import Character</button>
+            <input 
+              ref="fileInput" 
+              type="file" 
+              accept=".json" 
+              style="display: none"
+              @change="handleImport"
+            >
+          </div>
+        </div>
       </div>
     </header>
 
@@ -22,7 +40,7 @@
             @click="setActiveCharacter(char.id)"
             :class="['tab-button', { active: activeCharacterId === char.id }]"
           >
-            <span>{{ char.name }} ({{ char.class }})</span>
+            <span>{{ char.name }} ({{ char.classes[0].class }})</span>
             <button 
               @click.stop="deleteCharacter(char.id)"
               class="tab-close"
@@ -54,18 +72,29 @@
       @created="onCharacterCreated"
       @cancel="showNewCharacter = false"
     />
+
+    <!-- Party Manager Modal -->
+    <PartyManager 
+      v-if="showPartyManager"
+      :characters="characters"
+      @close="showPartyManager = false"
+      @select="selectCharacter"
+    />
   </div>
 </template>
 
 <script>
 import { useCharacterStore } from './store/characterStore.js'
+import { exportCharacterToJSON, exportCharacterToCSV, importCharacterFromJSON } from './utils/characterExport.js'
 import CharacterSheet from './components/CharacterSheet.vue'
 import CharacterCreator from './components/CharacterCreator.vue'
+import PartyManager from './components/PartyManager.vue'
 
 export default {
   components: {
     CharacterSheet,
-    CharacterCreator
+    CharacterCreator,
+    PartyManager
   },
   setup() {
     const store = useCharacterStore()
@@ -87,7 +116,8 @@ export default {
   },
   data() {
     return {
-      showNewCharacter: false
+      showNewCharacter: false,
+      showPartyManager: false
     }
   },
   methods: {
@@ -97,8 +127,46 @@ export default {
       this.showNewCharacter = false
     },
     updateCharacter(updates) {
-      this.updateCharacter(this.activeCharacterId, updates)
+      const store = useCharacterStore()
+      store.updateCharacter(this.activeCharacterId, updates)
       this.saveToLocalStorage()
+    },
+    exportActive(format) {
+      if (!this.activeCharacter) {
+        alert('No character selected')
+        return
+      }
+
+      if (format === 'json') {
+        exportCharacterToJSON(this.activeCharacter)
+      } else if (format === 'csv') {
+        exportCharacterToCSV(this.activeCharacter)
+      }
+    },
+    triggerImport() {
+      this.$refs.fileInput.click()
+    },
+    async handleImport(event) {
+      const file = event.target.files[0]
+      if (!file) return
+
+      try {
+        const character = await importCharacterFromJSON(file)
+        this.addCharacter(character)
+        this.saveToLocalStorage()
+        alert(`Character "${character.name}" imported successfully!`)
+      } catch (error) {
+        alert(`Import failed: ${error.message}`)
+      }
+
+      event.target.value = ''
+    },
+    openPartyManager() {
+      this.showPartyManager = true
+    },
+    selectCharacter(id) {
+      this.setActiveCharacter(id)
+      this.showPartyManager = false
     }
   }
 }
@@ -134,6 +202,71 @@ export default {
 .header-right {
   display: flex;
   gap: 10px;
+}
+
+.btn {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: #000;
+}
+
+.btn-primary:hover {
+  background: var(--primary-dark);
+}
+
+.btn-secondary {
+  background: var(--accent-info);
+  color: #fff;
+}
+
+.btn-secondary:hover {
+  background: #2563eb;
+}
+
+.dropdown {
+  position: relative;
+}
+
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: var(--bg-light);
+  border: 2px solid var(--primary);
+  border-radius: 4px;
+  min-width: 150px;
+  z-index: 100;
+  margin-top: 5px;
+}
+
+.dropdown:hover .dropdown-menu {
+  display: flex;
+  flex-direction: column;
+}
+
+.dropdown-menu button {
+  padding: 10px 15px;
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.dropdown-menu button:hover {
+  background: var(--bg-dark);
+  color: var(--primary);
 }
 
 .character-tabs {
@@ -203,23 +336,5 @@ export default {
 
 .empty-state .btn {
   margin-top: 20px;
-}
-
-.btn {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.2s;
-}
-
-.btn-primary {
-  background: var(--primary);
-  color: #000;
-}
-
-.btn-primary:hover {
-  background: var(--primary-dark);
 }
 </style>
