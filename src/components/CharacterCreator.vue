@@ -17,7 +17,7 @@
           <div class="form-row">
             <div class="form-group">
               <label>Race</label>
-              <select v-model="form.race" class="input-field">
+              <select v-model="form.race" @change="updateSubraces" class="input-field">
                 <option value="">Select Race</option>
                 <option v-for="(race, key) in CHARACTER_RACES" :key="key" :value="key">
                   {{ race.name }}
@@ -26,14 +26,72 @@
             </div>
 
             <div class="form-group">
-              <label>Class</label>
-              <select v-model="form.class" class="input-field">
+              <label>Sub-Race</label>
+              <select v-model="form.subrace" class="input-field" v-if="availableSubraces.length > 0">
+                <option value="">Select Sub-Race</option>
+                <option v-for="(subrace, idx) in availableSubraces" :key="idx" :value="idx">
+                  {{ subrace.name }}
+                </option>
+              </select>
+              <input v-else type="text" class="input-field" :value="'No sub-races'" disabled>
+            </div>
+          </div>
+        </div>
+
+        <!-- Class Selection -->
+        <div class="form-section">
+          <h3>Classes</h3>
+          <div class="class-mode">
+            <button 
+              @click="form.multiclass = false" 
+              :class="['mode-btn', { active: !form.multiclass }]"
+            >
+              Single Class
+            </button>
+            <button 
+              @click="form.multiclass = true" 
+              :class="['mode-btn', { active: form.multiclass }]"
+            >
+              Multiclass (Up to 5)
+            </button>
+          </div>
+
+          <!-- Single Class -->
+          <div v-if="!form.multiclass" class="class-selection">
+            <div class="form-group">
+              <label>Primary Class</label>
+              <select v-model="form.primaryClass" class="input-field">
                 <option value="">Select Class</option>
                 <option v-for="(cls, key) in CHARACTER_CLASSES" :key="key" :value="key">
                   {{ cls.name }}
                 </option>
               </select>
             </div>
+          </div>
+
+          <!-- Multiclass -->
+          <div v-if="form.multiclass" class="multiclass-selection">
+            <p class="info">Select up to 5 classes with their levels (must total at least 3)</p>
+            <div v-for="(classLevel, idx) in form.classLevels" :key="idx" class="multiclass-row">
+              <select v-model="form.classLevels[idx].class" class="input-field">
+                <option value="">Select Class</option>
+                <option v-for="(cls, key) in CHARACTER_CLASSES" :key="key" :value="key">
+                  {{ cls.name }}
+                </option>
+              </select>
+              <input 
+                v-model.number="form.classLevels[idx].level" 
+                type="number" 
+                class="input-field"
+                min="1"
+                max="20"
+                placeholder="Level"
+              >
+              <button @click="removeClassLevel(idx)" class="btn-remove" v-if="form.classLevels.length > 1">✕</button>
+            </div>
+            <button v-if="form.classLevels.length < 5" @click="addClassLevel" class="btn btn-secondary">
+              ➕ Add Class
+            </button>
           </div>
         </div>
 
@@ -148,7 +206,13 @@ export default {
       form: {
         name: '',
         race: 'HUMAN',
-        class: 'FIGHTER',
+        subrace: 0,
+        primaryClass: 'FIGHTER',
+        multiclass: false,
+        classLevels: [
+          { class: 'FIGHTER', level: 1 },
+          { class: 'THIEF', level: 1 }
+        ],
         abilities: {
           STR: 10,
           DEX: 10,
@@ -159,10 +223,27 @@ export default {
         },
         startingGold: 0,
         alignment: 'NG'
-      }
+      },
+      availableSubraces: []
     }
   },
+  mounted() {
+    this.updateSubraces()
+  },
   methods: {
+    updateSubraces() {
+      const race = CHARACTER_RACES[this.form.race]
+      this.availableSubraces = race?.subraces || []
+      this.form.subrace = 0
+    },
+    addClassLevel() {
+      if (this.form.classLevels.length < 5) {
+        this.form.classLevels.push({ class: '', level: 1 })
+      }
+    },
+    removeClassLevel(idx) {
+      this.form.classLevels.splice(idx, 1)
+    },
     rollAbilities() {
       const scores = rollAbilityScores()
       this.form.abilities = {
@@ -175,17 +256,62 @@ export default {
       }
     },
     createCharacter() {
-      if (!this.form.name || !this.form.race || !this.form.class) {
-        alert('Please fill in all required fields')
+      if (!this.form.name || !this.form.race) {
+        alert('Please fill in required fields')
         return
       }
 
+      let classes = []
+      let totalLevel = 0
+
+      if (!this.form.multiclass) {
+        if (!this.form.primaryClass) {
+          alert('Please select a class')
+          return
+        }
+        classes = [{
+          class: this.CHARACTER_CLASSES[this.form.primaryClass].name,
+          classKey: this.form.primaryClass,
+          level: 1
+        }]
+        totalLevel = 1
+      } else {
+        const validClasses = this.form.classLevels.filter(cl => cl.class && cl.level > 0)
+        if (validClasses.length < 2) {
+          alert('Multiclass requires at least 2 classes')
+          return
+        }
+        if (validClasses.length > 5) {
+          alert('Maximum 5 classes allowed')
+          return
+        }
+
+        const totalLevels = validClasses.reduce((sum, cl) => sum + cl.level, 0)
+        if (totalLevels < 3) {
+          alert('Total levels must be at least 3')
+          return
+        }
+
+        classes = validClasses.map(cl => ({
+          class: this.CHARACTER_CLASSES[cl.class].name,
+          classKey: cl.class,
+          level: cl.level
+        }))
+        totalLevel = validClasses[0].level
+      }
+
+      const race = CHARACTER_RACES[this.form.race]
+      const subrace = race.subraces[this.form.subrace]
+      const subraceAttrs = subrace ? { name: subrace.name, abilityMods: subrace.abilityMods } : { name: race.name, abilityMods: {} }
+
       const character = {
         name: this.form.name,
-        race: this.CHARACTER_RACES[this.form.race].name,
-        class: this.CHARACTER_CLASSES[this.form.class].name,
+        race: race.name,
+        subrace: subraceAttrs.name,
+        classes: classes,
+        isMulticlass: this.form.multiclass,
         stats: this.form.abilities,
-        level: 1,
+        level: totalLevel,
         experience: 0,
         gold: this.form.startingGold,
         alignment: this.form.alignment,
@@ -224,7 +350,7 @@ export default {
   border: 2px solid var(--primary);
   border-radius: 8px;
   width: 90%;
-  max-width: 800px;
+  max-width: 900px;
   max-height: 90vh;
   overflow-y: auto;
   display: flex;
@@ -308,6 +434,70 @@ export default {
   box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.1);
 }
 
+.class-mode {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.mode-btn {
+  padding: 10px 15px;
+  background: var(--bg-dark);
+  border: 2px solid #444;
+  color: var(--text-muted);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-weight: 500;
+}
+
+.mode-btn:hover {
+  border-color: var(--primary);
+}
+
+.mode-btn.active {
+  background: var(--primary);
+  color: #000;
+  border-color: var(--primary);
+}
+
+.class-selection {
+  background: var(--bg-dark);
+  padding: 15px;
+  border-radius: 4px;
+}
+
+.multiclass-selection {
+  background: var(--bg-dark);
+  padding: 15px;
+  border-radius: 4px;
+}
+
+.info {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-bottom: 15px;
+}
+
+.multiclass-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr auto;
+  gap: 10px;
+  margin-bottom: 10px;
+  align-items: flex-end;
+}
+
+.btn-remove {
+  padding: 8px 10px;
+  background: var(--accent-error);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
 .ability-method {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -340,12 +530,6 @@ export default {
   background: var(--bg-dark);
   padding: 15px;
   border-radius: 4px;
-}
-
-.info {
-  color: var(--text-muted);
-  font-size: 13px;
-  margin-bottom: 15px;
 }
 
 .ability-display {

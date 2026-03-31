@@ -3,7 +3,15 @@
     <div class="sheet-header">
       <div class="header-info">
         <h2>{{ character.name }}</h2>
-        <p>{{ character.race }} {{ character.class }} - Level {{ character.level }}</p>
+        <p v-if="!character.isMulticlass">
+          {{ character.subrace || character.race }} {{ character.classes[0].class }} - Level {{ character.level }}
+        </p>
+        <p v-else>
+          {{ character.subrace || character.race }} 
+          <span v-for="(cls, idx) in character.classes" :key="idx">
+            {{ cls.class }} <strong>{{ cls.level }}</strong><span v-if="idx < character.classes.length - 1"> / </span>
+          </span>
+        </p>
       </div>
       <div class="header-actions">
         <button @click="activeTab = 'stats'" :class="['tab-btn', { active: activeTab === 'stats' }]">
@@ -20,6 +28,9 @@
         </button>
       </div>
     </div>
+
+    <!-- Rest of template stays the same -->
+    ...
 
     <!-- Stats Tab -->
     <div v-if="activeTab === 'stats'" class="tab-content">

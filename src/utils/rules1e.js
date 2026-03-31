@@ -9,16 +9,104 @@ export const CHARACTER_CLASSES = {
   PALADIN: { name: 'Paladin', hitDice: '1d10', thac0Base: 10 },
   DRUID: { name: 'Druid', hitDice: '1d8', thac0Base: 10 },
   BARD: { name: 'Bard', hitDice: '1d6', thac0Base: 10 }
+export function calculateMulticlassHP(level, classKeys, conMod) {
+  let totalHP = 0
+  const classWeights = classKeys.map((key, idx) => {
+    const classData = CHARACTER_CLASSES[key]
+    const diceSize = parseInt(classData.hitDice.match(/\d+/)[0])
+    const classLevels = level
+    return { classData, diceSize, classLevels }
+  })
+
+  classWeights.forEach(({ classData, diceSize, classLevels }) => {
+    const baseHP = diceSize + (conMod * classLevels)
+    totalHP += baseHP + ((classLevels - 1) * (diceSize / 2)) + (conMod * (classLevels - 1))
+  })
+
+  return Math.max(1, Math.floor(totalHP / classKeys.length))
+}
+
+export function calculateMulticlassThac0(levels, classKeys) {
+  let avgThac0 = 0
+  classKeys.forEach((key, idx) => {
+    const level = levels[idx] || 1
+    avgThac0 += calculateThac0(level, key)
+  })
+  return Math.round(avgThac0 / classKeys.length)
+}
+
+export function calculateCombinedExperience(multiclassData) {
+  let totalExp = 0
+  Object.entries(multiclassData).forEach(([className, level]) => {
+    const table = Object.values(EXPERIENCE_TABLES).find(t => 
+      Object.keys(EXPERIENCE_TABLES).find(k => k === className)
+    ) || EXPERIENCE_TABLES.Fighter
+    totalExp += table[level - 1] || 0
+  })
+  return totalExp
+  }
 };
 
 export const CHARACTER_RACES = {
-  HUMAN: { name: 'Human', abilityMods: {}, restrictions: [] },
-  DWARF: { name: 'Dwarf', abilityMods: { CON: 1, CHA: -1 }, restrictions: ['Paladin', 'Ranger'] },
-  ELF: { name: 'Elf', abilityMods: { DEX: 1, CON: -1 }, restrictions: ['Cleric'] },
-  GNOME: { name: 'Gnome', abilityMods: { INT: 1, WIS: -1 }, restrictions: ['Cleric', 'Ranger'] },
-  HALFLING: { name: 'Halfling', abilityMods: { DEX: 1, STR: -1 }, restrictions: ['Cleric', 'Druid', 'Ranger', 'Paladin'] },
-  HALF_ORC: { name: 'Half-Orc', abilityMods: { STR: 1, INT: -1, CHA: -2 }, restrictions: [] },
-  HALF_ELF: { name: 'Half-Elf', abilityMods: {}, restrictions: [] }
+  HUMAN: { 
+    name: 'Human', 
+    subraces: [{ name: 'Standard Human', abilityMods: {} }],
+    abilityMods: {}, 
+    restrictions: [] 
+  },
+  DWARF: { 
+    name: 'Dwarf', 
+    subraces: [
+      { name: 'Mountain Dwarf', abilityMods: { STR: 1, CHA: -1 } },
+      { name: 'Hill Dwarf', abilityMods: { WIS: 1, CHA: -1 } }
+    ],
+    abilityMods: { CON: 1, CHA: -1 }, 
+    restrictions: ['Paladin', 'Ranger'] 
+  },
+  ELF: { 
+    name: 'Elf', 
+    subraces: [
+      { name: 'High Elf', abilityMods: { INT: 1, CON: -1 } },
+      { name: 'Wood Elf', abilityMods: { WIS: 1, CON: -1, STR: 1, DEX: 1 } },
+      { name: 'Drow', abilityMods: { DEX: 1, CHA: 1, STR: -1 } },
+      { name: 'Wild Elf', abilityMods: { DEX: 2, INT: -1, WIS: -1 } }
+    ],
+    abilityMods: { DEX: 1, CON: -1 }, 
+    restrictions: ['Cleric'] 
+  },
+  GNOME: { 
+    name: 'Gnome', 
+    subraces: [
+      { name: 'Forest Gnome', abilityMods: { DEX: 1, WIS: -1, INT: 1 } },
+      { name: 'Rock Gnome', abilityMods: { STR: 1, CON: 1, INT: 1, CHA: -2 } }
+    ],
+    abilityMods: { INT: 1, WIS: -1 }, 
+    restrictions: ['Cleric', 'Ranger'] 
+  },
+  HALFLING: { 
+    name: 'Halfling', 
+    subraces: [
+      { name: 'Lightfoot', abilityMods: { DEX: 2, STR: -1, CON: 1 } },
+      { name: 'Stout', abilityMods: { CON: 1, DEX: 1, STR: -1 } }
+    ],
+    abilityMods: { DEX: 1, STR: -1 }, 
+    restrictions: ['Cleric', 'Druid', 'Ranger', 'Paladin'] 
+  },
+  HALF_ORC: { 
+    name: 'Half-Orc', 
+    subraces: [{ name: 'Standard Half-Orc', abilityMods: { STR: 2, INT: -1, WIS: -1, CHA: -2 } }],
+    abilityMods: { STR: 1, INT: -1, CHA: -2 }, 
+    restrictions: [] 
+  },
+  HALF_ELF: { 
+    name: 'Half-Elf', 
+    subraces: [
+      { name: 'Ranger-Born', abilityMods: { DEX: 1, INT: 1 } },
+      { name: 'Urban Half-Elf', abilityMods: { CHA: 1, INT: 1 } }
+    ],
+    abilityMods: {}, 
+    restrictions: [] 
+  }
 };
 
 export const EXPERIENCE_TABLES = {
