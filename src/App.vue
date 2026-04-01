@@ -89,6 +89,7 @@
       @close="showPartyManager = false"
       @select="selectCharacter"
     />
+
     <!-- Race/Class Manager Modal -->
     <div v-if="showRaceClassManager" class="modal-overlay" @click="showRaceClassManager = false">
       <div class="modal-content" @click.stop style="max-width: 1200px; max-height: 90vh; overflow-y: auto;">
@@ -149,8 +150,14 @@ export default {
       this.addCharacter(character);
       this.showNewCharacter = false;
     },
-    updateRaces(races)   { this.saveToLocalStorage() },
-    updateClasses(classes){ this.saveToLocalStorage() },
+    updateRaces(races) {
+      // Races updated
+      this.saveToLocalStorage()
+    },
+    updateClasses(classes) {
+      // Classes updated
+      this.saveToLocalStorage()
+    },
     exportActive(format) {
       if (!this.activeCharacter) { alert('No character selected'); return }
       if (format === 'json') {
